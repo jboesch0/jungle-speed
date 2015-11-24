@@ -204,6 +204,20 @@ class JungleIG extends JFrame implements ActionListener {
     public boolean serverConnection() throws IOException {
 
         boolean ok = false;
+        if(comm == null){
+            try {
+                comm = new Socket(textServerIP.getText(), 12345);
+
+                oos = new ObjectOutputStream(comm.getOutputStream());
+                ois = new ObjectInputStream(comm.getInputStream());
+
+                ok = true;
+            }
+            catch(IOException e) {
+                System.out.println("problème de connexion au serveur : "+e.getMessage());
+                System.exit(1);
+            }
+        }
         // créer la connexion au serveur, ainsi que les flux uniquement si elle n'est pas active (i.e. comm != null)
         // envoyer le pseudo du joueur
         // lire un booléen -> ok
