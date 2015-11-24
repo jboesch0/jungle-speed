@@ -18,6 +18,7 @@ class Game {
 
     public synchronized Party createParty(String name, Player creator, int nbPlayers) {
         Party p = null;
+        //test
         // si partie déjà créée par creator, alors renvoyer null
         // sinon, créer une Party p et l'ajouter à parties
         return p;
