@@ -211,6 +211,7 @@ class JungleIG extends JFrame implements ActionListener {
                 oos = new ObjectOutputStream(comm.getOutputStream());
                 ois = new ObjectInputStream(comm.getInputStream());
 
+                oos.writeObject(textPseudo.getText());
                 ok = true;
             }
             catch(IOException e) {
@@ -244,7 +245,10 @@ class JungleIG extends JFrame implements ActionListener {
         }
         else if (e.getSource() == butListParty) {
             try {
-
+                oos.writeInt(1);
+                oos.flush();
+                String nomParty = (String) ois.readObject();
+                textInfoInit.append(nomParty);
                 // envoyer requête LIST PARTY
                 // recevoir résultat et l'afficher dans textInfoInit
 
@@ -259,6 +263,18 @@ class JungleIG extends JFrame implements ActionListener {
         else if (e.getSource() == butCreateParty) {
             try {
                 boolean ok;
+                oos.writeInt(2);
+                oos.writeObject(textCreate.getText());
+                int nbJoueurs= (int) spinNbPlayer.getValue();
+                oos.writeInt(nbJoueurs);
+                oos.flush();
+                ok = ois.readBoolean();
+                if (ok){
+                    setPartyPanel();
+                    textInfoParty.append("Attendre le début de la partie");
+                    ThreadClient threadClient = new ThreadClient(this);
+                    threadClient.run();
+                }
                 // envoyer requête CREATE PARTY (paramètres : nom partie et nb joueurs nécessaires)
                 // recevoir résultat -> ok
                 // si ok == true :
@@ -275,6 +291,18 @@ class JungleIG extends JFrame implements ActionListener {
 
             try {
                 int idPlayer;
+                oos.writeInt(3);
+                int numPartie = Integer.parseInt(textJoin.getText());
+                oos.writeInt(numPartie);
+                oos.flush();
+                idPlayer = ois.readInt();
+                if (idPlayer >= 1){
+                    setPartyPanel();
+                    textInfoParty.append("Attendre la début de la partie");
+                    ThreadClient threadClient = new ThreadClient(this);
+                    threadClient.run();
+
+                }
                 // envoyer requête JOIN PARTY (paramètres : numero partie)
                 // recevoir résultat -> idPlayer
                 // si idPlayer >= 1 :
@@ -289,6 +317,12 @@ class JungleIG extends JFrame implements ActionListener {
         }
         else if (e.getSource() == butPlay) {
             try {
+                oos.writeInt(6);
+                oos.writeObject(textPlay.getText());
+                oos.flush();
+                orderSent = true;
+                butPlay.setEnabled(false);
+                textPlay.setEnabled(false);
                 // envoyer requête PLAY (paramètre : contenu de textPlay)
                 // mettre orderSent à true
                 // bloquer le bouton play et le textfiled associé

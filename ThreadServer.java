@@ -26,9 +26,33 @@ class ThreadServer extends Thread {
     public void run() {
 
         String pseudo;
+        boolean ok = false;
 
         System.out.println("client connected.");
         try {
+            ois = new ObjectInputStream(comm.getInputStream());
+            oos = new ObjectOutputStream(comm.getOutputStream());
+
+            while (!ok){
+                pseudo = (String) ois.readObject();
+                for (Player p : game.players){
+                    if (p.name.equals(pseudo)){
+                        ok = false;
+                        break;
+                    } else {
+                        ok = true;
+                    }
+                }
+
+                if (ok){
+                    player = new Player(pseudo);
+                    oos.writeBoolean(true);
+                } else {
+                    oos.writeBoolean(false);
+                }
+                oos.flush();
+
+            }
             // initialisation des flux objet
             // tant que pas ok
             //    recevoir pseudo
@@ -52,6 +76,13 @@ class ThreadServer extends Thread {
                 oos.writeBoolean(true); // synchro signals so that thread client does not sends to quickly a request
                 oos.flush();
                 partyLoop();
+                currentParty.pool.removeStream(player.id);
+                boolean ret = currentParty.removePlayer(player);
+                if (ret){
+                    if (currentParty.nbPlayerInParty == 0){
+                        game.removeParty(currentParty);
+                    }
+                }
                 // supprimer le flux sortant associé à player du pool de la partie courante
                 // ret = supprimer player de la partie courante
                 // si ret == true (i.e. dernier joueur de la partie) supprimer la partie
@@ -64,6 +95,19 @@ class ThreadServer extends Thread {
             System.err.println("pb with client connection: "+e.getMessage());
         }
         // NB : si on arrive ici, c'est qu'il y a eu déconnexion ou erreur de requête
+
+
+        if (currentParty != null){
+            if (currentParty.getCurrentState() != 0){
+                currentParty.state = 3;
+            }
+            currentParty.pool.removeStream(player.id);
+            boolean ret = currentParty.removePlayer(player);
+            if (ret){
+                game.removeParty(currentParty);
+            }
+        }
+        game.removePlayer(player);
 
         // si partie courante != null (i.e. le joueur s'est déconnnecté en pleine partie)
         //    si l'état partie != en attente, etat partie = fin
@@ -79,7 +123,19 @@ class ThreadServer extends Thread {
         int idReq;
         boolean stop = false; // devient true en cas de requête CREATE ou JOIN réussie
         while (!stop) {
-
+             idReq = ois.readInt();
+            switch (idReq){
+                case 1:
+                    requestListParty();
+                    break;
+                case 2:
+                    requestCreateParty();
+                    break;
+                case 3: requestJoinParty();
+                    break;
+                default:
+                    throw new IllegalRequestException("Requete illegale");
+            }
             // recevoir n° requete
             // si n° correspond à LIST PARTY, CREATE PARTY ou JOIN PARTY appeler la méthode correspondante
             // sinon générer une exception IllegalRequest
@@ -92,6 +148,26 @@ class ThreadServer extends Thread {
 
         while (true) {
 
+            if (currentParty.state == 3){
+                return;
+            }
+            idReq = ois.readInt();
+            if (currentParty.state == 3){
+                return;
+            }
+            switch (idReq){
+                case 4:
+                    requestWaitPartyStarts();
+                    break;
+                case 5:
+                    requestWaitTurnStarts();
+                    break;
+                case 6:
+                    requestPlay();
+                    break;
+                default:
+                    throw new IllegalRequestException("Requete illegale");
+            }
             // si etat partie == fin, retour
             // recevoir n° requete
             // si etat partie == fin, retour
@@ -101,13 +177,26 @@ class ThreadServer extends Thread {
     }
 
     public void requestListParty() throws IOException,IllegalRequestException {
+        try {
+            List<Party> parties = game.parties;
+            String nomParty = "";
+            for (Party p : parties){
+                nomParty += "-" + p.name + "\n";
+            }
+            oos.writeObject(nomParty);
+            oos.flush();
 
-        // traiter requete LIST PARTY (sans oublier les cas d'erreur)
+        }catch (IOException e){
+            e.printStackTrace();
+        }
     }
 
     public boolean requestCreateParty() throws IOException,IllegalRequestException {
 
         boolean rep = false; // mis a true si la requête permet effectivement de créer une nouvelle partie.
+
+
+
 
         // traiter requete CREATE PARTY (sans oublier les cas d'erreur)
 
