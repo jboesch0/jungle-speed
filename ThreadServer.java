@@ -194,14 +194,18 @@ class ThreadServer extends Thread {
     public boolean requestCreateParty() throws IOException,IllegalRequestException {
 
         boolean rep = false; // mis a true si la requête permet effectivement de créer une nouvelle partie.
-
-
-
+        try {
+            String nomParty = (String) ois.readObject();
+            int nbJoueurs = ois.readInt();
+            Party party = game.createParty(nomParty ,player, nbJoueurs);
+            party.pool.addStream(player.id, oos);
+            rep = true;
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
 
         // traiter requete CREATE PARTY (sans oublier les cas d'erreur)
-
         // NB : ne pas oublier d'ajouter le flux oos au pool de la partie créée
-
         return rep;
     }
 
@@ -210,7 +214,11 @@ class ThreadServer extends Thread {
         boolean rep = false; // mis a true si la requête permet effectivement de rejoindre une partie existante
 
         // traiter requete JOIN PARTY (sans oublier les cas d'erreur)
+        int numParty = (int) ois.readInt();
+        Party party = game.parties.get(numParty);
+        game.playerJoinParty(player, game.parties.get(numParty));
 
+        party.pool.addStream(player.id, oos);
         // NB : ne pas oublier d'ajouter le flux oos au pool de la partie rejointe
         return rep;
     }
