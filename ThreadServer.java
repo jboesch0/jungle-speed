@@ -35,20 +35,29 @@ class ThreadServer extends Thread {
 
             while (!ok){
                 pseudo = (String) ois.readObject();
-                for (Player p : game.players){
-                    if (p.name.equals(pseudo)){
-                        ok = false;
-                        break;
-                    } else {
-                        ok = true;
+
+                if (game.players.size() == 0){
+                    ok = true;
+                } else {
+                    for (Player p : game.players){
+                        if (p.name.equals(pseudo)){
+                            ok = false;
+                            break;
+                        } else {
+                            ok = true;
+                        }
                     }
                 }
 
+
                 if (ok){
                     player = new Player(pseudo);
+                    game.players.add(player);
                     oos.writeBoolean(true);
+                    ok = true;
                 } else {
                     oos.writeBoolean(false);
+                    ok = true;
                 }
                 oos.flush();
 
@@ -62,20 +71,24 @@ class ThreadServer extends Thread {
             //    sinon envoyer false au client
         }
         catch(IOException e) {
-            System.err.println("problem with client connection. Aborting");
+            System.err.println("problem with client connection. Aborting (ThreadServer ");
             return;
         }
         catch(ClassNotFoundException e) {
-            System.err.println("problem with client request. Aborting");
+            System.err.println("problem with client request. Aborting (ThreadServer)");
             return;
         }
-
         try {
             while (true) {
                 initLoop();
                 oos.writeBoolean(true); // synchro signals so that thread client does not sends to quickly a request
                 oos.flush();
-                partyLoop();
+                try {
+                    System.out.println("Party Loop");
+                    partyLoop();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 currentParty.pool.removeStream(player.id);
                 boolean ret = currentParty.removePlayer(player);
                 if (ret){
@@ -89,10 +102,10 @@ class ThreadServer extends Thread {
             }
         }
         catch(IllegalRequestException e) {
-            System.err.println("client sent an illegal request: "+e.getMessage());
+            System.err.println("client sent an illegal request: (ThreadServer)"+e.getMessage());
         }
         catch(IOException e) {
-            System.err.println("pb with client connection: "+e.getMessage());
+            System.err.println("pb with client connection: (ThreadServer)"+e.getMessage());
         }
         // NB : si on arrive ici, c'est qu'il y a eu déconnexion ou erreur de requête
 
@@ -127,14 +140,17 @@ class ThreadServer extends Thread {
             switch (idReq){
                 case 1:
                     requestListParty();
+                    stop = true;
                     break;
                 case 2:
                     requestCreateParty();
+                    stop = true;
                     break;
                 case 3: requestJoinParty();
+                    stop = true;
                     break;
                 default:
-                    throw new IllegalRequestException("Requete illegale");
+                    throw new IllegalRequestException("Requete illegale (ThreadServer)");
             }
             // recevoir n° requete
             // si n° correspond à LIST PARTY, CREATE PARTY ou JOIN PARTY appeler la méthode correspondante
@@ -142,7 +158,7 @@ class ThreadServer extends Thread {
         }
     }
 
-    public void partyLoop() throws IllegalRequestException,IOException  {
+    public void partyLoop() throws IllegalRequestException,IOException, InterruptedException  {
 
         int idReq;
 
@@ -166,7 +182,7 @@ class ThreadServer extends Thread {
                     requestPlay();
                     break;
                 default:
-                    throw new IllegalRequestException("Requete illegale");
+                    throw new IllegalRequestException("Requete illegale (ThreadServer)");
             }
             // si etat partie == fin, retour
             // recevoir n° requete
@@ -177,11 +193,19 @@ class ThreadServer extends Thread {
     }
 
     public void requestListParty() throws IOException,IllegalRequestException {
+        String nomParty;
         try {
-            List<Party> parties = game.parties;
-            String nomParty = "";
-            for (Party p : parties){
-                nomParty += "-" + p.name + "\n";
+            System.out.println(game.parties.size());
+            if (game.parties.size() == 0){
+                nomParty = "Pas de parties";
+            } else{
+                List<Party> parties = game.parties;
+                nomParty = "";
+
+                for (int i = 0, partiesSize = parties.size(); i < partiesSize; i++) {
+                    Party p = parties.get(i);
+                    nomParty += "Partie n° " + i + p.name + " createur " + p.creator.name +"\n";
+                }
             }
             oos.writeObject(nomParty);
             oos.flush();
@@ -199,13 +223,17 @@ class ThreadServer extends Thread {
             int nbJoueurs = ois.readInt();
             Party party = game.createParty(nomParty ,player, nbJoueurs);
             party.pool.addStream(player.id, oos);
+            currentParty = party;
             rep = true;
+
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
 
         // traiter requete CREATE PARTY (sans oublier les cas d'erreur)
         // NB : ne pas oublier d'ajouter le flux oos au pool de la partie créée
+        //oos.writeInt(JungleServer.REQ_WAITPARTYSTARTS);
+        //oos.flush();
         return rep;
     }
 
@@ -216,22 +244,43 @@ class ThreadServer extends Thread {
         // traiter requete JOIN PARTY (sans oublier les cas d'erreur)
         int numParty = (int) ois.readInt();
         Party party = game.parties.get(numParty);
-        game.playerJoinParty(player, game.parties.get(numParty));
 
-        party.pool.addStream(player.id, oos);
-        // NB : ne pas oublier d'ajouter le flux oos au pool de la partie rejointe
+        if (game.playerJoinParty(player, game.parties.get(numParty))){
+            party.pool.addStream(player.id, oos);
+            rep = true;
+        }
         return rep;
     }
 
     public void requestWaitPartyStarts() throws IOException,IllegalRequestException {
 
+        try {
+            currentParty.waitForPartyStarts();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        oos.writeInt(player.id);
         // traiter requete WAIT PARY STARTS (sans oublier les cas d'erreur)
 
     }
 
-    public void requestWaitTurnStarts() throws IOException,IllegalRequestException {
+    public void requestWaitTurnStarts() throws IOException, IllegalRequestException, InterruptedException {
 
         Player currentPlayer;
+        currentParty.waitForTurnStarts();
+        currentPlayer = currentParty.currentPlayer;
+        if (currentParty.state == Party.PARTY_END){
+            oos.writeInt(-1);
+        } else {
+            oos.writeInt(currentPlayer.id);
+        }
+        if (currentParty.currentPlayer == player){
+            wait(3000);
+            currentParty.revealCard();
+            Object visibles = currentParty.getCurrentCards();
+            currentParty.setCurrentState(Party.PARTY_MUSTPLAY);
+            currentParty.pool.sendToAll(visibles);
+        }
         // traiter cas d'erreur
         // attendre début tour
         // récupérer le joueur courant dans le tour -> currentPlayer
@@ -253,6 +302,44 @@ class ThreadServer extends Thread {
 
         // traiter cas d'erreur
 
+        try {
+            String ordreClient = (String) ois.readObject();
+            switch (ordreClient){
+                case "TT":
+                    idAction = JungleServer.ACT_TAKETOTEM;
+                    break;
+                case  "TH":
+                    idAction = JungleServer.ACT_HANDTOTEM;
+                    break;
+                case "":
+                    idAction = JungleServer.ACT_NOP;
+                    break;
+                default:
+                    idAction = JungleServer.ACT_INCORRECT;
+                    break;
+            }
+            lastPlayed = currentParty.integratePlayerOrder(player, idAction);
+            if (lastPlayed){
+                if (currentParty.state == 3){
+                    currentParty.pool.sendToAll("Partie finie");
+                    oos.writeBoolean(true);
+                    return;
+                }
+                currentParty.analyseResults();
+                String resultMsg = currentParty.resultMsg;
+                currentParty.pool.sendToAll(resultMsg);
+                if (currentParty.state == 3){
+                    oos.writeBoolean(true);
+                } else {
+                    oos.writeBoolean(false);
+                }
+            }
+
+
+
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
         // recevoir la String qui indique l'ordre envoyé par le client
         // en fonction de cette String, initialiser idAction à ACT_TAKETOTEM ou ACT_HANDTOTEM ou ACT_NOP ou ACT_INCORRECT
         // lastPlayed <- intégrer l'ordre donné par le joueur (cf. integratePlayerOrder() )

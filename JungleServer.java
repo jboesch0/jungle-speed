@@ -27,16 +27,13 @@ class JungleServer {
         int port = 12345;
         ThreadServer t = null;
 
-        if (args.length != 1) {
-            System.out.println("usage: JungleServer");
-            System.exit(1);
-        }
+
 
         try {
             conn = new ServerSocket(port);
         }
         catch(IOException e) {
-            System.out.println("cannot create server socket: "+e.getMessage());
+            System.out.println("cannot create server socket: (JungleServer 1)"+e.getMessage());
             System.exit(1);
         }
 
@@ -51,7 +48,7 @@ class JungleServer {
 
             }
             catch(IOException e) {
-                System.out.println("communication problem: "+e.getMessage());
+                System.out.println("communication problem: (JungleServer 2)"+e.getMessage());
             }
         }
     }

@@ -72,6 +72,21 @@ class Party {
 
 
     public synchronized void addPlayer(Player p) {
+        System.out.println("avant if addPlayer");
+        if (!(players.contains(p)) && (nbPlayerInParty < nbNeededPlayers)){
+            System.out.println("dans if addPlayer");
+            players.add(p);
+            nbPlayerInParty++;
+            List<Card> paquet = allCards.takeXFirst(12);
+            p.joinParty(nbPlayerInParty, paquet);
+            if (nbPlayerInParty == nbNeededPlayers){
+                playerOfNextTurn = players.get(0);
+                nbPlayerInTurn = 0;
+                initNewTurn();
+                state = PARTY_ONGOING;
+                notifyAll();
+            }
+        }
         // si p n'est pas déjà dans cette partie ET le nb de joueurs < nb joueurs nécessaires :
         //    ajouter p à players
         //    incrémenter le nb de joueurs dans la partie
@@ -88,6 +103,15 @@ class Party {
     }
 
     public synchronized boolean removePlayer(Player p) {
+        players.remove(p);
+        nbPlayerInParty--;
+        currentPlayer.id = -1;
+        semBeginTurn.put(1);
+        if (nbPlayerInParty == 0 ){
+            return true;
+        } else {
+            return false;
+        }
         // supprimer p de players
         // décrémenter nb joueur dans la partie
         // remettre id de player à -1 (= pas dans une partie)
@@ -95,7 +119,10 @@ class Party {
         // si nb joueurs dans partie == 0, renvoyer vrai sinon renvoyer false
     }
 
-    public synchronized void waitForPartyStarts() {
+    public synchronized void waitForPartyStarts() throws InterruptedException {
+        while (state == 0 && nbNeededPlayers != nbPlayerInParty){
+            wait();
+        }
         // tant que état partie == en attente ET nb joueurs dans la partie != nb joueurs nécessaires
         //    faire dodo
     }
@@ -106,6 +133,14 @@ class Party {
        have to wait until another one put tokens in the semaphore.
      */
     public void waitForTurnStarts() {
+        nbPlayerInTurn++;
+        if (nbPlayerInTurn == nbPlayerInParty){
+            nbPlayerInTurn = 0;
+            currentPlayer = playerOfNextTurn;
+            initNewTurn();
+            semBeginTurn.put(1);
+        }
+        semBeginTurn.get();
         // incrementer nb joueurs dans le tour
         // si nb joueurs dans le tour == nb joueurs dans partie
         //    remettre nb joueurs dans le tour à 0
@@ -149,7 +184,18 @@ class Party {
     }
 
     public synchronized Object getCurrentCards() {
-        Object s;
+        Object s = "";
+        String res = "";
+        CardPacket packet = new CardPacket();
+        for(Player p : players) {
+            packet.addCards(p.giveRevealedCards());
+        }
+
+        for (Card c : packet.cards){
+            res +=  c.card + ", ";
+        }
+
+        s = res;
         // récupérer toutes les cartes actuellement visibles autour de la table et en faire un objet
         // NB : à vous de décider la classe de cette objet et comment il est construit.
         // Vous pouvez par exemple simplement créer une chaîne de caractères

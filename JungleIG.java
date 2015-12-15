@@ -57,7 +57,9 @@ class JungleIG extends JFrame implements ActionListener {
     public void createWidget() {
 
         panConn = createPanelConnect();
+        panConn.setSize(new Dimension(350, 100));
         panInit = createPanelInit();
+        panInit.setPreferredSize(new Dimension(1200,300));
         panParty = createPanelPlay();
 
         setContentPane(panConn);
@@ -215,7 +217,7 @@ class JungleIG extends JFrame implements ActionListener {
                 ok = true;
             }
             catch(IOException e) {
-                System.out.println("problème de connexion au serveur : "+e.getMessage());
+                System.out.println("problème de connexion au serveur : (JungleIG)"+e.getMessage());
                 System.exit(1);
             }
         }
@@ -235,27 +237,34 @@ class JungleIG extends JFrame implements ActionListener {
                     setInitPanel();
                 }
                 else {
-                    System.out.println("pseudo is already taken. Choose another one and try again.");
+                    System.out.println("pseudo is already taken. Choose another one and try again. (JungleIG)");
                 }
             }
             catch(IOException err) {
-                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting...");
+                System.err.println("pb with the connection to server: "+err.getMessage()+ "\n.Aborting... (JungleIG 1)");
                 System.exit(1);
             }
         }
         else if (e.getSource() == butListParty) {
             try {
-                oos.writeInt(1);
+                oos.writeInt(JungleServer.REQ_LISTPARTY);
                 oos.flush();
-                String nomParty = (String) ois.readObject();
-                textInfoInit.append(nomParty);
+                System.out.println("flush");
+                boolean pret = ois.readBoolean();
+                System.out.println(pret);
+                if (pret){
+                    String nomParty = (String) ois.readObject();
+                    System.out.println("apres read");
+                    textInfoInit.append(nomParty);
+                }
+
                 // envoyer requête LIST PARTY
                 // recevoir résultat et l'afficher dans textInfoInit
 
             }
             catch(ClassNotFoundException err ) {}
             catch(IOException err) {
-                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting...");
+                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting... (JungleIG 2)");
                 System.exit(1);
             }
 
@@ -270,10 +279,13 @@ class JungleIG extends JFrame implements ActionListener {
                 oos.flush();
                 ok = ois.readBoolean();
                 if (ok){
+                    System.out.println("ok");
                     setPartyPanel();
+                    System.out.println("Apres set");
                     textInfoParty.append("Attendre le début de la partie");
                     ThreadClient threadClient = new ThreadClient(this);
-                    threadClient.run();
+                    threadClient.start();
+                    System.out.println("apres run");
                 }
                 // envoyer requête CREATE PARTY (paramètres : nom partie et nb joueurs nécessaires)
                 // recevoir résultat -> ok
@@ -283,7 +295,7 @@ class JungleIG extends JFrame implements ActionListener {
                 //    créer un ThreadClient et lancer son exécution
             }
             catch(IOException err) {
-                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting...");
+                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting... (JungleIG 3)");
                 System.exit(1);
             }
         }
@@ -291,16 +303,17 @@ class JungleIG extends JFrame implements ActionListener {
 
             try {
                 int idPlayer;
-                oos.writeInt(3);
+                oos.writeInt(JungleServer.REQ_JOINPARTY);
                 int numPartie = Integer.parseInt(textJoin.getText());
                 oos.writeInt(numPartie);
                 oos.flush();
                 idPlayer = ois.readInt();
                 if (idPlayer >= 1){
+                    System.out.println(idPlayer);
                     setPartyPanel();
                     textInfoParty.append("Attendre la début de la partie");
                     ThreadClient threadClient = new ThreadClient(this);
-                    threadClient.run();
+                    threadClient.start();
 
                 }
                 // envoyer requête JOIN PARTY (paramètres : numero partie)
@@ -311,7 +324,7 @@ class JungleIG extends JFrame implements ActionListener {
                 //    créer un ThreadClient et lancer son exécution
             }
             catch(IOException err) {
-                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting...");
+                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting... (JungleIG 4)");
                 System.exit(1);
             }
         }
@@ -328,7 +341,7 @@ class JungleIG extends JFrame implements ActionListener {
                 // bloquer le bouton play et le textfiled associé
             }
             catch(IOException err) {
-                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting...");
+                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting... (JungleIG)");
                 System.exit(1);
             }
         }
@@ -340,7 +353,7 @@ class JungleIG extends JFrame implements ActionListener {
                 comm = null;
             }
             catch(IOException err) {
-                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting...");
+                System.err.println("pb with the connection to server: "+err.getMessage()+"\n.Aborting... (JungleIG)");
                 System.exit(1);
             }
         }
